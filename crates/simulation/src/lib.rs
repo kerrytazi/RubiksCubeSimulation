@@ -1,4 +1,10 @@
-use crate::{rubiks_action::RubiksAction, rubiks_cube::{RubiksCube}, utils};
+mod cube;
+mod rubiks_action;
+mod rubiks_cube;
+mod utils;
+
+use rubiks_action::RubiksAction;
+use rubiks_cube::RubiksCube;
 
 use rand::RngExt;
 use three_d::*;
@@ -214,10 +220,9 @@ pub struct SimulationWindow {
 }
 
 impl SimulationWindow {
-	pub fn new(window_name: &str, min_size: (u32, u32)) -> Result<Self, Box<dyn std::error::Error>> {
+	pub fn new(window_name: &str) -> Result<Self, Box<dyn std::error::Error>> {
 		let window = Window::new(WindowSettings {
 				title: window_name.to_string(),
-				min_size,
 				..Default::default()
 			})?;
 

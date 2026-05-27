@@ -1,7 +1,14 @@
 use three_d::*;
-use crate::consts;
 use crate::cube::Cube;
 use crate::rubiks_action::RubiksAction;
+
+const COLOR_EMPTY: Srgba = Srgba::new_opaque(64, 64, 64);
+const COLOR_WHITE: Srgba = Srgba::new_opaque(255, 255, 255);
+const COLOR_YELLOW: Srgba = Srgba::new_opaque(255, 255, 0);
+const COLOR_GREEN: Srgba = Srgba::new_opaque(0, 255, 0);
+const COLOR_BLUE: Srgba = Srgba::new_opaque(0, 0, 255);
+const COLOR_RED: Srgba = Srgba::new_opaque(255, 0, 0);
+const COLOR_ORANGE: Srgba = Srgba::new_opaque(255, 165, 0);
 
 pub struct RubiksCube {
 	cubes: [[[Box<Cube>; 3]; 3]; 3],
@@ -17,12 +24,12 @@ impl RubiksCube {
 					let cz = ((z as i32 - 1) * 2) as f32 * 1.02;
 
 					Box::new(Cube::new(&context, vec3(cx, cy, cz), [
-						if x == 0 { consts::COLOR_ORANGE } else { consts::COLOR_EMPTY },
-						if x == 2 { consts::COLOR_RED } else { consts::COLOR_EMPTY },
-						if y == 0 { consts::COLOR_YELLOW } else { consts::COLOR_EMPTY },
-						if y == 2 { consts::COLOR_WHITE } else { consts::COLOR_EMPTY },
-						if z == 0 { consts::COLOR_BLUE } else { consts::COLOR_EMPTY },
-						if z == 2 { consts::COLOR_GREEN } else { consts::COLOR_EMPTY },
+						if x == 0 { COLOR_ORANGE } else { COLOR_EMPTY },
+						if x == 2 { COLOR_RED } else { COLOR_EMPTY },
+						if y == 0 { COLOR_YELLOW } else { COLOR_EMPTY },
+						if y == 2 { COLOR_WHITE } else { COLOR_EMPTY },
+						if z == 0 { COLOR_BLUE } else { COLOR_EMPTY },
+						if z == 2 { COLOR_GREEN } else { COLOR_EMPTY },
 					]))
 				})
 			})

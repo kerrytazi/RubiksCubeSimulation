@@ -1,4 +1,4 @@
-# RubiksCubeSimulation
+# rubiks_cube_simulation
 Rubiks Cube Simulation written in [rust](https://rust-lang.org/) with [three-d](https://docs.rs/crate/three-d).
 
 ## Controls
@@ -47,4 +47,4 @@ Image for reference:
 
 <img src="https://jperm.net/images/notation.png" alt="rotation.png" style="width:50%; height:auto;">
 
-## License: [MIT](https://github.com/kerrytazi/RubiksCubeSimulation/blob/main/LICENSE)
+## License: [MIT](https://github.com/kerrytazi/rubiks_cube_simulation/blob/main/LICENSE)

@@ -1,0 +1,32 @@
+{
+	"version": "0.2.0",
+	"configurations": [
+		{
+			"name": "Debug executable 'RubiksCubeSimulation'",
+			"type": "lldb",
+			"request": "launch",
+			"cargo": {
+				"args": [
+					"run",
+					"--bin=RubiksCubeSimulation"
+				]
+			},
+			"args": [],
+			"terminal": "console",
+			"postDebugTask": "Close Debug Terminal"
+		},
+		{
+			"name": "Debug unit tests in executable 'testapp'",
+			"type": "lldb",
+			"request": "launch",
+			"cargo": {
+				"args": [
+					"test",
+					"--bin=RubiksCubeSimulation"
+				]
+			},
+			"terminal": "console",
+			"postDebugTask": "Close Debug Terminal"
+		}
+	]
+}

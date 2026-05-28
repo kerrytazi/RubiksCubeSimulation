@@ -1,4 +1,7 @@
+mod anim_function;
+mod cube_colors;
 mod cube;
+mod keyframe;
 mod rubiks_action;
 mod rubiks_cube;
 mod utils;
@@ -9,6 +12,9 @@ use rubiks_cube::RubiksCube;
 use rand::RngExt;
 use three_d::*;
 
+const DEFAULT_ANIMATION_DURATION_MS: f64 = 125.0;
+const DEFAULT_WIDE_NOTATION_W: bool = false;
+
 struct Simulation {
 	context: Context,
 	camera: Camera,
@@ -18,6 +24,7 @@ struct Simulation {
 	rubiks: RubiksCube,
 	history: Vec::<RubiksAction>,
 	past_active_history_item: usize,
+	animations: std::collections::VecDeque<RubiksAction>,
 
 	pressed_keys: std::collections::HashSet<Key>,
 
@@ -32,43 +39,32 @@ struct Simulation {
 impl Simulation {
 	fn render(&mut self, frame_input: &mut FrameInput) -> FrameOutput {
 		self.camera.set_viewport(frame_input.viewport);
+		self.camera_text.set_viewport(frame_input.viewport);
+
 		self.control.handle_events(&mut self.camera, &mut frame_input.events);
 
+		self.update_animations(frame_input.accumulated_time);
+
 		for event in &frame_input.events {
-			self.handle_event(&event);
+			self.handle_event(&event, frame_input.accumulated_time);
 		}
 
-		frame_input
-			.screen()
-			.clear(ClearState::color_and_depth(0.8, 0.8, 0.8, 1.0, 1.0))
-			.render(
-				&self.camera,
-				self.rubiks.into_iter(),
-				&[],
-			);
+		let screen = frame_input.screen();
+
+		screen.clear(ClearState::color_and_depth(0.8, 0.8, 0.8, 1.0, 1.0));
+
+		screen.render(&self.camera, self.rubiks.into_iter(), &[]);
 
 		if self.show_axes {
-			frame_input
-				.screen()
-				.render(
-					&self.camera,
-					self.axes.into_iter(),
-					&[],
-				);
+			screen.render(&self.camera, self.axes.into_iter(), &[]);
 		}
 
-		frame_input
-			.screen()
-			.render(
-				&self.camera_text,
-				[&self.history_text_left, &self.history_text_right],
-				&[],
-			);
+		screen.render(&self.camera_text, [&self.history_text_left, &self.history_text_right], &[]);
 
 		FrameOutput::default()
 	}
 
-	fn handle_keypress_event(&mut self, event: &Event) {
+	fn handle_keypress_event(&mut self, event: &Event, current_time: f64) {
 		let key = if let Event::KeyPress { kind, .. } = event {
 			kind
 		} else {
@@ -81,56 +77,56 @@ impl Simulation {
 
 		match event {
 			Event::KeyPress { kind: Key::L, modifiers, .. } => {
-				self.add_new_action(RubiksAction::Left{ prime: modifiers.shift, wide: modifiers.alt });
+				self.add_new_action(current_time, RubiksAction::Left{ prime: modifiers.shift, wide: modifiers.alt });
 			},
 			Event::KeyPress { kind: Key::R, modifiers, .. } => {
-				self.add_new_action(RubiksAction::Right{ prime: modifiers.shift, wide: modifiers.alt });
+				self.add_new_action(current_time, RubiksAction::Right{ prime: modifiers.shift, wide: modifiers.alt });
 			},
 			Event::KeyPress { kind: Key::D, modifiers, .. } => {
-				self.add_new_action(RubiksAction::Down{ prime: modifiers.shift, wide: modifiers.alt });
+				self.add_new_action(current_time, RubiksAction::Down{ prime: modifiers.shift, wide: modifiers.alt });
 			},
 			Event::KeyPress { kind: Key::U, modifiers, .. } => {
-				self.add_new_action(RubiksAction::Up{ prime: modifiers.shift, wide: modifiers.alt });
+				self.add_new_action(current_time, RubiksAction::Up{ prime: modifiers.shift, wide: modifiers.alt });
 			},
 			Event::KeyPress { kind: Key::B, modifiers, .. } => {
-				self.add_new_action(RubiksAction::Back{ prime: modifiers.shift, wide: modifiers.alt });
+				self.add_new_action(current_time, RubiksAction::Back{ prime: modifiers.shift, wide: modifiers.alt });
 			},
 			Event::KeyPress { kind: Key::F, modifiers, .. } => {
-				self.add_new_action(RubiksAction::Front{ prime: modifiers.shift, wide: modifiers.alt });
+				self.add_new_action(current_time, RubiksAction::Front{ prime: modifiers.shift, wide: modifiers.alt });
 			},
 			Event::KeyPress { kind: Key::M, modifiers, .. } => {
-				self.add_new_action(RubiksAction::Middle{ prime: modifiers.shift });
+				self.add_new_action(current_time, RubiksAction::Middle{ prime: modifiers.shift });
 			},
 			Event::KeyPress { kind: Key::E, modifiers, .. } => {
-				self.add_new_action(RubiksAction::Equatorial{ prime: modifiers.shift });
+				self.add_new_action(current_time, RubiksAction::Equatorial{ prime: modifiers.shift });
 			},
 			Event::KeyPress { kind: Key::S, modifiers, .. } => {
-				self.add_new_action(RubiksAction::Standing{ prime: modifiers.shift });
+				self.add_new_action(current_time, RubiksAction::Standing{ prime: modifiers.shift });
 			},
 			Event::KeyPress { kind: Key::X, modifiers, .. } => {
-				self.add_new_action(RubiksAction::RotateCubeX{ prime: modifiers.shift });
+				self.add_new_action(current_time, RubiksAction::RotateCubeX{ prime: modifiers.shift });
 			},
 			Event::KeyPress { kind: Key::Y, modifiers, .. } => {
-				self.add_new_action(RubiksAction::RotateCubeY{ prime: modifiers.shift });
+				self.add_new_action(current_time, RubiksAction::RotateCubeY{ prime: modifiers.shift });
 			},
 			Event::KeyPress { kind: Key::Z, modifiers, .. } => {
-				self.add_new_action(RubiksAction::RotateCubeZ{ prime: modifiers.shift });
+				self.add_new_action(current_time, RubiksAction::RotateCubeZ{ prime: modifiers.shift });
 			},
 			Event::KeyPress { kind: Key::Tab, .. } => {
 				self.show_axes = !self.show_axes;
 			},
 			Event::KeyPress { kind: Key::ArrowLeft, modifiers, .. } => {
 				if modifiers.ctrl {
-					while self.try_move_history_back() {}
+					while self.try_move_history_back(current_time) {}
 				} else {
-					self.try_move_history_back();
+					self.try_move_history_back(current_time);
 				}
 			},
 			Event::KeyPress { kind: Key::ArrowRight, modifiers, .. } => {
 				if modifiers.ctrl {
-					while self.try_move_history_forward() {}
+					while self.try_move_history_forward(current_time) {}
 				} else {
-					self.try_move_history_forward();
+					self.try_move_history_forward(current_time);
 				}
 			},
 			Event::KeyPress { kind: Key::F1, .. } => {
@@ -143,7 +139,7 @@ impl Simulation {
 		}
 	}
 
-	fn handle_keyrelease_event(&mut self, event: &Event) {
+	fn handle_keyrelease_event(&mut self, event: &Event, _current_time: f64) {
 		let key = if let Event::KeyRelease { kind, .. } = event {
 			kind
 		} else {
@@ -153,17 +149,17 @@ impl Simulation {
 		self.pressed_keys.remove(key);
 	}
 
-	fn handle_event(&mut self, event: &Event) {
+	fn handle_event(&mut self, event: &Event, current_time: f64) {
 		match event {
-			Event::KeyPress { .. } => self.handle_keypress_event(event),
-			Event::KeyRelease { .. } => self.handle_keyrelease_event(event),
+			Event::KeyPress { .. } => self.handle_keypress_event(event, current_time),
+			Event::KeyRelease { .. } => self.handle_keyrelease_event(event, current_time),
 			_ => {},
 		}
 	}
 
-	fn try_move_history_back(&mut self) -> bool {
+	fn try_move_history_back(&mut self, current_time: f64) -> bool {
 		if self.past_active_history_item > 0 {
-			self.rubiks.apply(self.history[self.past_active_history_item - 1].inverse());
+			self.add_animation(current_time, self.history[self.past_active_history_item - 1].inverse());
 			self.past_active_history_item -= 1;
 			self.recreate_history();
 			true
@@ -172,10 +168,10 @@ impl Simulation {
 		}
 	}
 
-	fn try_move_history_forward(&mut self) -> bool {
+	fn try_move_history_forward(&mut self, current_time: f64) -> bool {
 		if self.past_active_history_item < self.history.len() {
 			self.past_active_history_item += 1;
-			self.rubiks.apply(self.history[self.past_active_history_item - 1]);
+			self.add_animation(current_time, self.history[self.past_active_history_item - 1]);
 			self.recreate_history();
 			true
 		} else {
@@ -195,24 +191,44 @@ impl Simulation {
 
 		for _ in 0..moves_count {
 			match rng.random_range(0..9) {
-				0 => self.rubiks.rotate_x(0, rng.random_bool(0.5)),
-				1 => self.rubiks.rotate_x(1, rng.random_bool(0.5)),
-				2 => self.rubiks.rotate_x(2, rng.random_bool(0.5)),
-				3 => self.rubiks.rotate_y(0, rng.random_bool(0.5)),
-				4 => self.rubiks.rotate_y(1, rng.random_bool(0.5)),
-				5 => self.rubiks.rotate_y(2, rng.random_bool(0.5)),
-				6 => self.rubiks.rotate_z(0, rng.random_bool(0.5)),
-				7 => self.rubiks.rotate_z(1, rng.random_bool(0.5)),
-				8 => self.rubiks.rotate_z(2, rng.random_bool(0.5)),
-				_ => { panic!("shuffle"); },
+				0 => self.rubiks.rotate_x(0, rng.random_bool(0.5), 0.0, 0.0),
+				1 => self.rubiks.rotate_x(1, rng.random_bool(0.5), 0.0, 0.0),
+				2 => self.rubiks.rotate_x(2, rng.random_bool(0.5), 0.0, 0.0),
+				3 => self.rubiks.rotate_y(0, rng.random_bool(0.5), 0.0, 0.0),
+				4 => self.rubiks.rotate_y(1, rng.random_bool(0.5), 0.0, 0.0),
+				5 => self.rubiks.rotate_y(2, rng.random_bool(0.5), 0.0, 0.0),
+				6 => self.rubiks.rotate_z(0, rng.random_bool(0.5), 0.0, 0.0),
+				7 => self.rubiks.rotate_z(1, rng.random_bool(0.5), 0.0, 0.0),
+				8 => self.rubiks.rotate_z(2, rng.random_bool(0.5), 0.0, 0.0),
+				_ => { panic!("rubik shuffle out of bounds"); },
 			}
 		}
 	}
 
-	fn add_new_action(&mut self, action: RubiksAction) {
+	fn update_animations(&mut self, current_time: f64) {
+		if self.rubiks.update_animations(current_time) {
+			self.animations.pop_front().unwrap();
+
+			if let Some(next_action) = self.animations.front() {
+				self.rubiks.apply(*next_action, current_time, DEFAULT_ANIMATION_DURATION_MS);
+			}
+		}
+	}
+
+	fn add_animation(&mut self, current_time: f64, action: RubiksAction) {
+		if self.animations.len() == 0 {
+			self.rubiks.apply(action, current_time, DEFAULT_ANIMATION_DURATION_MS);
+		}
+
+		if DEFAULT_ANIMATION_DURATION_MS != 0.0 {
+			self.animations.push_back(action);
+		}
+	}
+
+	fn add_new_action(&mut self, current_time: f64, action: RubiksAction) {
 		self.history.truncate(self.past_active_history_item);
 		self.history.push(action);
-		self.rubiks.apply(action);
+		self.add_animation(current_time, action);
 		self.past_active_history_item += 1;
 		self.recreate_history();
 	}
@@ -244,7 +260,7 @@ impl Simulation {
 
 		for (index, item) in self.history.iter().enumerate() {
 			let text_ref = if index < self.past_active_history_item { &mut text_left } else { &mut text_right };
-			text_ref.push_str(item.to_string_notation(false));
+			text_ref.push_str(item.to_string_notation(DEFAULT_WIDE_NOTATION_W));
 			text_ref.push_str(" ");
 		}
 
@@ -279,7 +295,7 @@ impl SimulationWindow {
 
 		let camera = Camera::new_perspective(
 			window.viewport(),
-			vec3(9.0, 9.0, 9.0),
+			vec3(5.0, 5.0, 5.0),
 			vec3(0.0, 0.0, 0.0),
 			vec3(0.0, 1.0, 0.0),
 			degrees(60.0),
@@ -293,7 +309,7 @@ impl SimulationWindow {
 
 		let rubiks = RubiksCube::new(&context);
 
-		let axes = utils::my_axes(&context, 0.1, 5.0);
+		let axes = utils::my_axes(&context, 0.05, 3.0);
 
 		let text_generator = TextGenerator::new(include_bytes!("assets/OpenSans-Regular.ttf"), 0, 30.0).unwrap();
 
@@ -322,6 +338,7 @@ impl SimulationWindow {
 				rubiks,
 				history: Vec::new(),
 				past_active_history_item: 0,
+				animations: std::collections::VecDeque::new(),
 				pressed_keys: std::collections::HashSet::new(),
 				text_generator,
 				axes,

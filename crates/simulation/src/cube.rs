@@ -1,90 +1,178 @@
+use crate::{cube_colors::CubeColors, keyframe::{KeyFrame, KeyFrameResult}};
+
 use three_d::*;
 
+enum CubeAnimationType {
+	RotateX,
+	RotateY,
+	RotateZ,
+}
+
+struct CubeAnimation {
+	start_mat: Mat4,
+	keyframe: KeyFrame,
+	anim_type: CubeAnimationType,
+}
+
+impl CubeAnimation {
+	fn new(cube: &Cube, start_time: f64, duration: f64, angle: Rad<f32>, anim_type: CubeAnimationType) -> Self {
+		CubeAnimation {
+			start_mat: cube.gm.transformation(),
+			keyframe: KeyFrame::new_ease_in_out(start_time, duration, angle.0 as f64),
+			anim_type: anim_type,
+		}
+	}
+}
+
+type CubeGm = Gm<Mesh, ColorMaterial>;
+
 pub struct Cube {
-	left: Gm<Mesh, ColorMaterial>,
-	right: Gm<Mesh, ColorMaterial>,
-	down: Gm<Mesh, ColorMaterial>,
-	up: Gm<Mesh, ColorMaterial>,
-	back: Gm<Mesh, ColorMaterial>,
-	front: Gm<Mesh, ColorMaterial>,
+	gm: CubeGm,
+	animation: Option<Box<CubeAnimation>>,
 }
 
 impl Cube {
-	pub fn new(context: &Context, center: Vector3<f32>, colors: [Srgba; 6]) -> Self {
+	pub fn new(context: &Context, center: Vec3, cube_colors: CubeColors) -> Self {
+		let mesh = Self::create_mesh(center, cube_colors);
+
+		let material = {
+			let mut material = ColorMaterial::new(
+				&context,
+				&CpuMaterial::default(),
+			);
+			material.render_states.cull = Cull::Back;
+			material
+		};
+
 		Cube {
-			left:  Self::create_plane(context, center + vec3(-1.0,  0.0,  0.0), Mat4::from_angle_y(degrees(-90.0)), colors[0]),
-			right: Self::create_plane(context, center + vec3( 1.0,  0.0,  0.0), Mat4::from_angle_y(degrees(90.0)), colors[1]),
-			down:  Self::create_plane(context, center + vec3( 0.0, -1.0,  0.0), Mat4::from_angle_x(degrees(90.0)), colors[2]),
-			up:    Self::create_plane(context, center + vec3( 0.0,  1.0,  0.0), Mat4::from_angle_x(degrees(-90.0)), colors[3]),
-			back:  Self::create_plane(context, center + vec3( 0.0,  0.0, -1.0), Mat4::from_angle_y(degrees(180.0)), colors[4]),
-			front: Self::create_plane(context, center + vec3( 0.0,  0.0,  1.0), Mat4::identity(), colors[5]),
+			gm: CubeGm::new(Mesh::new(&context, &mesh), material),
+			animation: None,
 		}
 	}
 
-	fn create_plane(context: &Context, center: Vector3<f32>, rotation: Matrix4<f32>, color: Srgba) -> Gm<Mesh, ColorMaterial> {
-		let plane_mesh = CpuMesh::square();
-		let mut material = ColorMaterial::new(
-			&context,
-			&CpuMaterial {
-				albedo: color,
-				..Default::default()
-			},
-		);
-		material.render_states.cull = Cull::Back;
-		let mut plane = Gm::new(
-			Mesh::new(&context, &plane_mesh),
-			material,
-		);
-		plane.set_transformation(Mat4::from_translation(center) * rotation);
-		plane
+	fn add_plane(
+		indices: &mut Vec<u16>,
+		positions: &mut Vec<Vec3>,
+		colors: &mut Vec<Srgba>,
+		center: Vec3,
+		rotation: Quat,
+		color: Srgba
+	) {
+		if positions.len() > u16::max_value() as usize {
+			panic!("add_plane: positions.len() > u16::max_value()");
+		}
+
+		let idx_offset = positions.len() as u16;
+
+		indices.extend_from_slice(&[
+			idx_offset + 0,
+			idx_offset + 1,
+			idx_offset + 2,
+			idx_offset + 2,
+			idx_offset + 3,
+			idx_offset + 0,
+		]);
+
+		let halfsize = 0.5;
+
+		positions.extend_from_slice(&[
+			center + rotation * Vec3::new(-halfsize, -halfsize, 0.0),
+			center + rotation * Vec3::new( halfsize, -halfsize, 0.0),
+			center + rotation * Vec3::new( halfsize,  halfsize, 0.0),
+			center + rotation * Vec3::new(-halfsize,  halfsize, 0.0),
+		]);
+
+		colors.extend_from_slice(&[
+			color,
+			color,
+			color,
+			color,
+		]);
 	}
 
-	pub fn rotate_x(&mut self, cw: bool) {
-		for side in self {
-			let prev = side.transformation();
-			side.set_transformation(Mat4::from_angle_x(degrees(if cw { -90.0 } else { 90.0 })) * prev);
+	fn create_mesh(center: Vec3, cube_colors: CubeColors) -> CpuMesh {
+		let mut indices = Vec::with_capacity(6 * 6);
+		let mut positions  = Vec::with_capacity(4 * 6);
+		let mut colors  = Vec::with_capacity(4 * 6);
+
+		Self::add_plane(&mut indices, &mut positions, &mut colors, center + vec3(-0.5,  0.0,  0.0), Quat::from_angle_y(degrees(-90.0)), cube_colors.left.to_srgba());
+		Self::add_plane(&mut indices, &mut positions, &mut colors, center + vec3( 0.5,  0.0,  0.0), Quat::from_angle_y(degrees( 90.0)), cube_colors.right.to_srgba());
+		Self::add_plane(&mut indices, &mut positions, &mut colors, center + vec3( 0.0, -0.5,  0.0), Quat::from_angle_x(degrees( 90.0)), cube_colors.down.to_srgba());
+		Self::add_plane(&mut indices, &mut positions, &mut colors, center + vec3( 0.0,  0.5,  0.0), Quat::from_angle_x(degrees(-90.0)), cube_colors.up.to_srgba());
+		Self::add_plane(&mut indices, &mut positions, &mut colors, center + vec3( 0.0,  0.0, -0.5), Quat::from_angle_y(degrees(180.0)), cube_colors.back.to_srgba());
+		Self::add_plane(&mut indices, &mut positions, &mut colors, center + vec3( 0.0,  0.0,  0.5), Quat::zero(),                       cube_colors.front.to_srgba());
+
+		CpuMesh {
+			indices: Indices::U16(indices),
+			positions: Positions::F32(positions),
+			colors: Some(colors),
+			..Default::default()
 		}
 	}
 
-	pub fn rotate_y(&mut self, cw: bool) {
-		for side in self {
-			let prev = side.transformation();
-			side.set_transformation(Mat4::from_angle_y(degrees(if cw { -90.0 } else { 90.0 })) * prev);
+	pub fn rotate_x(&mut self, cw: bool, start_time: f64, duration: f64) {
+		let angle: Rad<f32> = degrees(if cw { -90.0 } else { 90.0 }).into();
+
+		if duration > 0.0 {
+			self.animation = Some(Box::new(CubeAnimation::new(self, start_time, duration, angle, CubeAnimationType::RotateX)));
+		} else {
+			let prev = self.gm.transformation();
+			self.gm.set_transformation(Mat4::from_angle_x(angle) * prev);
 		}
 	}
 
-	pub fn rotate_z(&mut self, cw: bool) {
-		for side in self {
-			let prev = side.transformation();
-			side.set_transformation(Mat4::from_angle_z(degrees(if cw { -90.0 } else { 90.0 })) * prev);
+	pub fn rotate_y(&mut self, cw: bool, start_time: f64, duration: f64) {
+		let angle: Rad<f32> = degrees(if cw { -90.0 } else { 90.0 }).into();
+
+		if duration > 0.0 {
+			self.animation = Some(Box::new(CubeAnimation::new(self, start_time, duration, angle, CubeAnimationType::RotateY)));
+		} else {
+			let prev = self.gm.transformation();
+			self.gm.set_transformation(Mat4::from_angle_y(angle) * prev);
 		}
+	}
+
+	pub fn rotate_z(&mut self, cw: bool, start_time: f64, duration: f64) {
+		let angle: Rad<f32> = degrees(if cw { -90.0 } else { 90.0 }).into();
+
+		if duration > 0.0 {
+			self.animation = Some(Box::new(CubeAnimation::new(self, start_time, duration, angle, CubeAnimationType::RotateZ)));
+		} else {
+			let prev = self.gm.transformation();
+			self.gm.set_transformation(Mat4::from_angle_z(angle) * prev);
+		}
+	}
+
+	pub fn update_animation(&mut self, current_time: f64) -> bool {
+		let animation = if let Some(animation) = &self.animation {
+			animation
+		} else {
+			return false;
+		};
+
+		let KeyFrameResult { value, ended } = animation.keyframe.calc(current_time);
+
+		let rotation_mat = match animation.anim_type {
+			CubeAnimationType::RotateX => { Mat4::from_angle_x(radians(value as f32)) },
+			CubeAnimationType::RotateY => { Mat4::from_angle_y(radians(value as f32)) },
+			CubeAnimationType::RotateZ => { Mat4::from_angle_z(radians(value as f32)) },
+		};
+
+		self.gm.set_transformation(rotation_mat * animation.start_mat);
+
+		if ended {
+			self.animation = None;
+		}
+
+		ended
 	}
 }
 
 impl<'a> IntoIterator for &'a Cube {
-	type Item = &'a Gm<Mesh, ColorMaterial>;
-	type IntoIter = std::array::IntoIter<Self::Item, 6>;
+	type Item = <&'a CubeGm as IntoIterator>::Item;
+	type IntoIter = <&'a CubeGm as IntoIterator>::IntoIter;
 
 	fn into_iter(self) -> Self::IntoIter {
-		let arr: [Self::Item; 6] = [
-			&self.left, &self.right,
-			&self.down, &self.up,
-			&self.front, &self.back,
-		];
-		arr.into_iter()
-	}
-}
-
-impl<'a> IntoIterator for &'a mut Cube {
-	type Item = &'a mut Gm<Mesh, ColorMaterial>;
-	type IntoIter = std::array::IntoIter<Self::Item, 6>;
-
-	fn into_iter(self) -> Self::IntoIter {
-		let arr: [Self::Item; 6] = [
-			&mut self.left, &mut self.right,
-			&mut self.down, &mut self.up,
-			&mut self.front, &mut self.back,
-		];
-		arr.into_iter()
+		self.gm.into_iter()
 	}
 }

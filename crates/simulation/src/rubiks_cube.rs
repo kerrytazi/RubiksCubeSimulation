@@ -1,14 +1,7 @@
 use three_d::*;
 use crate::cube::Cube;
+use crate::cube_colors::{CubeColor, CubeColors};
 use crate::rubiks_action::RubiksAction;
-
-const COLOR_EMPTY: Srgba = Srgba::new_opaque(64, 64, 64);
-const COLOR_WHITE: Srgba = Srgba::new_opaque(255, 255, 255);
-const COLOR_YELLOW: Srgba = Srgba::new_opaque(255, 255, 0);
-const COLOR_GREEN: Srgba = Srgba::new_opaque(0, 255, 0);
-const COLOR_BLUE: Srgba = Srgba::new_opaque(0, 0, 255);
-const COLOR_RED: Srgba = Srgba::new_opaque(255, 0, 0);
-const COLOR_ORANGE: Srgba = Srgba::new_opaque(255, 165, 0);
 
 pub struct RubiksCube {
 	cubes: [[[Box<Cube>; 3]; 3]; 3],
@@ -19,18 +12,16 @@ impl RubiksCube {
 		let cubes = std::array::from_fn(|x| {
 			std::array::from_fn(|y| {
 				std::array::from_fn(|z| {
-					let cx = ((x as i32 - 1) * 2) as f32 * 1.02;
-					let cy = ((y as i32 - 1) * 2) as f32 * 1.02;
-					let cz = ((z as i32 - 1) * 2) as f32 * 1.02;
+					let center = vec3(x as f32 - 1.0, y as f32 - 1.0, z as f32 - 1.0) * 1.02;
 
-					Box::new(Cube::new(&context, vec3(cx, cy, cz), [
-						if x == 0 { COLOR_ORANGE } else { COLOR_EMPTY },
-						if x == 2 { COLOR_RED } else { COLOR_EMPTY },
-						if y == 0 { COLOR_YELLOW } else { COLOR_EMPTY },
-						if y == 2 { COLOR_WHITE } else { COLOR_EMPTY },
-						if z == 0 { COLOR_BLUE } else { COLOR_EMPTY },
-						if z == 2 { COLOR_GREEN } else { COLOR_EMPTY },
-					]))
+					Box::new(Cube::new(&context, center, CubeColors {
+						left: if x == 0 { CubeColor::Orange } else { CubeColor::None },
+						right: if x == 2 { CubeColor::Red } else { CubeColor::None },
+						down: if y == 0 { CubeColor::Yellow } else { CubeColor::None },
+						up: if y == 2 { CubeColor::White } else { CubeColor::None },
+						back: if z == 0 { CubeColor::Blue } else { CubeColor::None },
+						front: if z == 2 { CubeColor::Green } else { CubeColor::None },
+					}))
 				})
 			})
 		});
@@ -38,10 +29,10 @@ impl RubiksCube {
 		RubiksCube { cubes }
 	}
 
-	pub fn rotate_x(&mut self, i: usize, cw: bool) {
+	pub fn rotate_x(&mut self, i: usize, cw: bool, start_time: f64, duration: f64) {
 		for y in 0..3 {
 			for z in 0..3 {
-				self.cubes[i][y][z].rotate_x(cw);
+				self.cubes[i][y][z].rotate_x(cw, start_time, duration);
 			}
 		}
 
@@ -50,10 +41,10 @@ impl RubiksCube {
 		}
 	}
 
-	pub fn rotate_y(&mut self, i: usize, cw: bool) {
+	pub fn rotate_y(&mut self, i: usize, cw: bool, start_time: f64, duration: f64) {
 		for x in 0..3 {
 			for z in 0..3 {
-				self.cubes[x][i][z].rotate_y(cw);
+				self.cubes[x][i][z].rotate_y(cw, start_time, duration);
 			}
 		}
 
@@ -62,10 +53,10 @@ impl RubiksCube {
 		}
 	}
 
-	pub fn rotate_z(&mut self, i: usize, cw: bool) {
+	pub fn rotate_z(&mut self, i: usize, cw: bool, start_time: f64, duration: f64) {
 		for x in 0..3 {
 			for y in 0..3 {
-				self.cubes[x][y][i].rotate_z(cw);
+				self.cubes[x][y][i].rotate_z(cw, start_time, duration);
 			}
 		}
 
@@ -74,21 +65,35 @@ impl RubiksCube {
 		}
 	}
 
-	pub fn apply(&mut self, action: RubiksAction) {
+	pub fn apply(&mut self, action: RubiksAction, start_time: f64, duration: f64) {
 		match action {
-			RubiksAction::Left { prime, wide } =>  { self.rotate_x(0, prime); if wide { self.rotate_x(1, prime); } },
-			RubiksAction::Right { prime, wide } => { self.rotate_x(2, !prime); if wide { self.rotate_x(1, !prime); } },
-			RubiksAction::Down { prime, wide } =>  { self.rotate_y(0, prime); if wide { self.rotate_y(1, prime); } },
-			RubiksAction::Up { prime, wide } =>    { self.rotate_y(2, !prime); if wide { self.rotate_y(1, !prime); } },
-			RubiksAction::Back { prime, wide } =>  { self.rotate_z(0, prime); if wide { self.rotate_z(1, prime); } },
-			RubiksAction::Front { prime, wide } => { self.rotate_z(2, !prime); if wide { self.rotate_z(1, !prime); } },
-			RubiksAction::Middle { prime } =>      { self.rotate_x(1, prime); },
-			RubiksAction::Equatorial { prime } =>  { self.rotate_y(1, prime); },
-			RubiksAction::Standing { prime } =>    { self.rotate_z(1, prime); },
-			RubiksAction::RotateCubeX { prime } => { self.rotate_x(0, prime); self.rotate_x(1, prime); self.rotate_x(2, prime); },
-			RubiksAction::RotateCubeY { prime } => { self.rotate_y(0, prime); self.rotate_y(1, prime); self.rotate_y(2, prime); },
-			RubiksAction::RotateCubeZ { prime } => { self.rotate_z(0, !prime); self.rotate_z(1, !prime); self.rotate_z(2, !prime); },
+			RubiksAction::Left { prime, wide } =>  { self.rotate_x(0,  prime, start_time, duration); if wide { self.rotate_x(1,  prime, start_time, duration); } },
+			RubiksAction::Right { prime, wide } => { self.rotate_x(2, !prime, start_time, duration); if wide { self.rotate_x(1, !prime, start_time, duration); } },
+			RubiksAction::Down { prime, wide } =>  { self.rotate_y(0,  prime, start_time, duration); if wide { self.rotate_y(1,  prime, start_time, duration); } },
+			RubiksAction::Up { prime, wide } =>    { self.rotate_y(2, !prime, start_time, duration); if wide { self.rotate_y(1, !prime, start_time, duration); } },
+			RubiksAction::Back { prime, wide } =>  { self.rotate_z(0,  prime, start_time, duration); if wide { self.rotate_z(1,  prime, start_time, duration); } },
+			RubiksAction::Front { prime, wide } => { self.rotate_z(2, !prime, start_time, duration); if wide { self.rotate_z(1, !prime, start_time, duration); } },
+			RubiksAction::Middle { prime } =>      { self.rotate_x(1,  prime, start_time, duration); },
+			RubiksAction::Equatorial { prime } =>  { self.rotate_y(1,  prime, start_time, duration); },
+			RubiksAction::Standing { prime } =>    { self.rotate_z(1,  prime, start_time, duration); },
+			RubiksAction::RotateCubeX { prime } => { self.rotate_x(0,  prime, start_time, duration); self.rotate_x(1,  prime, start_time, duration); self.rotate_x(2,  prime, start_time, duration); },
+			RubiksAction::RotateCubeY { prime } => { self.rotate_y(0,  prime, start_time, duration); self.rotate_y(1,  prime, start_time, duration); self.rotate_y(2,  prime, start_time, duration); },
+			RubiksAction::RotateCubeZ { prime } => { self.rotate_z(0, !prime, start_time, duration); self.rotate_z(1, !prime, start_time, duration); self.rotate_z(2, !prime, start_time, duration); },
 		}
+	}
+
+	pub fn update_animations(&mut self, current_time: f64) -> bool {
+		let mut ended = false;
+
+		for x in 0..3 {
+			for y in 0..3 {
+				for z in 0..3 {
+					ended = self.cubes[x][y][z].update_animation(current_time) || ended;
+				}
+			}
+		}
+
+		ended
 	}
 
 	fn swap(&mut self, index1: (usize, usize, usize), index2: (usize, usize, usize)) {

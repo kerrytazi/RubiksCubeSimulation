@@ -33,6 +33,8 @@ Rotate whole cube.
 |`Z`|Rotation around the Z axis|
 
 ### History manipulation
+
+Hold `Ctrl` to move to the first/last move.
 |Keyboard Button|Action|
 |-|-|
 |`Left Arrow`|Undo last move|

@@ -35,99 +35,7 @@ impl Simulation {
 		self.control.handle_events(&mut self.camera, &mut frame_input.events);
 
 		for event in &frame_input.events {
-			if let Event::KeyPress { kind, .. } = event {
-				if self.pressed_keys.insert(*kind) {
-					match event {
-						Event::KeyPress { kind: Key::L, modifiers, .. } => {
-							self.add_new_action(RubiksAction::Left{ prime: modifiers.shift, wide: modifiers.alt });
-						},
-						Event::KeyPress { kind: Key::R, modifiers, .. } => {
-							self.add_new_action(RubiksAction::Right{ prime: modifiers.shift, wide: modifiers.alt });
-						},
-						Event::KeyPress { kind: Key::D, modifiers, .. } => {
-							self.add_new_action(RubiksAction::Down{ prime: modifiers.shift, wide: modifiers.alt });
-						},
-						Event::KeyPress { kind: Key::U, modifiers, .. } => {
-							self.add_new_action(RubiksAction::Up{ prime: modifiers.shift, wide: modifiers.alt });
-						},
-						Event::KeyPress { kind: Key::B, modifiers, .. } => {
-							self.add_new_action(RubiksAction::Back{ prime: modifiers.shift, wide: modifiers.alt });
-						},
-						Event::KeyPress { kind: Key::F, modifiers, .. } => {
-							self.add_new_action(RubiksAction::Front{ prime: modifiers.shift, wide: modifiers.alt });
-						},
-						Event::KeyPress { kind: Key::M, modifiers, .. } => {
-							self.add_new_action(RubiksAction::Middle{ prime: modifiers.shift });
-						},
-						Event::KeyPress { kind: Key::E, modifiers, .. } => {
-							self.add_new_action(RubiksAction::Equatorial{ prime: modifiers.shift });
-						},
-						Event::KeyPress { kind: Key::S, modifiers, .. } => {
-							self.add_new_action(RubiksAction::Standing{ prime: modifiers.shift });
-						},
-						Event::KeyPress { kind: Key::X, modifiers, .. } => {
-							self.add_new_action(RubiksAction::RotateCubeX{ prime: modifiers.shift });
-						},
-						Event::KeyPress { kind: Key::Y, modifiers, .. } => {
-							self.add_new_action(RubiksAction::RotateCubeY{ prime: modifiers.shift });
-						},
-						Event::KeyPress { kind: Key::Z, modifiers, .. } => {
-							self.add_new_action(RubiksAction::RotateCubeZ{ prime: modifiers.shift });
-						},
-						Event::KeyPress { kind: Key::Tab, .. } => {
-							self.show_axes = !self.show_axes;
-						},
-						Event::KeyPress { kind: Key::ArrowLeft, .. } => {
-							if self.past_active_history_item > 0 {
-								self.rubiks.apply(self.history[self.past_active_history_item - 1].inverse());
-								self.past_active_history_item -= 1;
-								self.recreate_history();
-							}
-						},
-						Event::KeyPress { kind: Key::ArrowRight, .. } => {
-							if self.past_active_history_item < self.history.len() {
-								self.past_active_history_item += 1;
-								self.rubiks.apply(self.history[self.past_active_history_item - 1]);
-								self.recreate_history();
-							}
-						},
-						Event::KeyPress { kind: Key::F1, .. } => {
-							self.history.clear();
-							self.past_active_history_item = 0;
-							self.recreate_history();
-							self.rubiks = RubiksCube::new(&self.context);
-						},
-						Event::KeyPress { kind: Key::F2, .. } => {
-							self.history.clear();
-							self.past_active_history_item = 0;
-							self.recreate_history();
-							self.rubiks = RubiksCube::new(&self.context);
-
-							let mut rng = rand::rng();
-
-							for _ in 0..20 {
-								match rng.random_range(0..9) {
-									0 => self.rubiks.rotate_x(0, rng.random_bool(0.5)),
-									1 => self.rubiks.rotate_x(1, rng.random_bool(0.5)),
-									2 => self.rubiks.rotate_x(2, rng.random_bool(0.5)),
-									3 => self.rubiks.rotate_y(0, rng.random_bool(0.5)),
-									4 => self.rubiks.rotate_y(1, rng.random_bool(0.5)),
-									5 => self.rubiks.rotate_y(2, rng.random_bool(0.5)),
-									6 => self.rubiks.rotate_z(0, rng.random_bool(0.5)),
-									7 => self.rubiks.rotate_z(1, rng.random_bool(0.5)),
-									8 => self.rubiks.rotate_z(2, rng.random_bool(0.5)),
-									_ => {},
-								}
-							}
-						},
-						_ => {},
-					}
-				}
-			}
-
-			if let Event::KeyRelease { kind, .. } = event {
-				self.pressed_keys.remove(kind);
-			}
+			self.handle_event(&event);
 		}
 
 		frame_input
@@ -158,6 +66,147 @@ impl Simulation {
 			);
 
 		FrameOutput::default()
+	}
+
+	fn handle_keypress_event(&mut self, event: &Event) {
+		let key = if let Event::KeyPress { kind, .. } = event {
+			kind
+		} else {
+			panic!("handle_keypress_event");
+		};
+
+		if !self.pressed_keys.insert(*key) {
+			return;
+		}
+
+		match event {
+			Event::KeyPress { kind: Key::L, modifiers, .. } => {
+				self.add_new_action(RubiksAction::Left{ prime: modifiers.shift, wide: modifiers.alt });
+			},
+			Event::KeyPress { kind: Key::R, modifiers, .. } => {
+				self.add_new_action(RubiksAction::Right{ prime: modifiers.shift, wide: modifiers.alt });
+			},
+			Event::KeyPress { kind: Key::D, modifiers, .. } => {
+				self.add_new_action(RubiksAction::Down{ prime: modifiers.shift, wide: modifiers.alt });
+			},
+			Event::KeyPress { kind: Key::U, modifiers, .. } => {
+				self.add_new_action(RubiksAction::Up{ prime: modifiers.shift, wide: modifiers.alt });
+			},
+			Event::KeyPress { kind: Key::B, modifiers, .. } => {
+				self.add_new_action(RubiksAction::Back{ prime: modifiers.shift, wide: modifiers.alt });
+			},
+			Event::KeyPress { kind: Key::F, modifiers, .. } => {
+				self.add_new_action(RubiksAction::Front{ prime: modifiers.shift, wide: modifiers.alt });
+			},
+			Event::KeyPress { kind: Key::M, modifiers, .. } => {
+				self.add_new_action(RubiksAction::Middle{ prime: modifiers.shift });
+			},
+			Event::KeyPress { kind: Key::E, modifiers, .. } => {
+				self.add_new_action(RubiksAction::Equatorial{ prime: modifiers.shift });
+			},
+			Event::KeyPress { kind: Key::S, modifiers, .. } => {
+				self.add_new_action(RubiksAction::Standing{ prime: modifiers.shift });
+			},
+			Event::KeyPress { kind: Key::X, modifiers, .. } => {
+				self.add_new_action(RubiksAction::RotateCubeX{ prime: modifiers.shift });
+			},
+			Event::KeyPress { kind: Key::Y, modifiers, .. } => {
+				self.add_new_action(RubiksAction::RotateCubeY{ prime: modifiers.shift });
+			},
+			Event::KeyPress { kind: Key::Z, modifiers, .. } => {
+				self.add_new_action(RubiksAction::RotateCubeZ{ prime: modifiers.shift });
+			},
+			Event::KeyPress { kind: Key::Tab, .. } => {
+				self.show_axes = !self.show_axes;
+			},
+			Event::KeyPress { kind: Key::ArrowLeft, modifiers, .. } => {
+				if modifiers.ctrl {
+					while self.try_move_history_back() {}
+				} else {
+					self.try_move_history_back();
+				}
+			},
+			Event::KeyPress { kind: Key::ArrowRight, modifiers, .. } => {
+				if modifiers.ctrl {
+					while self.try_move_history_forward() {}
+				} else {
+					self.try_move_history_forward();
+				}
+			},
+			Event::KeyPress { kind: Key::F1, .. } => {
+				self.reset_rubiks();
+			},
+			Event::KeyPress { kind: Key::F2, .. } => {
+				self.shuffle(20);
+			},
+			_ => {},
+		}
+	}
+
+	fn handle_keyrelease_event(&mut self, event: &Event) {
+		let key = if let Event::KeyRelease { kind, .. } = event {
+			kind
+		} else {
+			panic!("handle_keyrelease_event");
+		};
+
+		self.pressed_keys.remove(key);
+	}
+
+	fn handle_event(&mut self, event: &Event) {
+		match event {
+			Event::KeyPress { .. } => self.handle_keypress_event(event),
+			Event::KeyRelease { .. } => self.handle_keyrelease_event(event),
+			_ => {},
+		}
+	}
+
+	fn try_move_history_back(&mut self) -> bool {
+		if self.past_active_history_item > 0 {
+			self.rubiks.apply(self.history[self.past_active_history_item - 1].inverse());
+			self.past_active_history_item -= 1;
+			self.recreate_history();
+			true
+		} else {
+			false
+		}
+	}
+
+	fn try_move_history_forward(&mut self) -> bool {
+		if self.past_active_history_item < self.history.len() {
+			self.past_active_history_item += 1;
+			self.rubiks.apply(self.history[self.past_active_history_item - 1]);
+			self.recreate_history();
+			true
+		} else {
+			false
+		}
+	}
+
+	fn reset_rubiks(&mut self) {
+		self.history.clear();
+		self.past_active_history_item = 0;
+		self.recreate_history();
+		self.rubiks = RubiksCube::new(&self.context);
+	}
+
+	fn shuffle(&mut self, moves_count: usize) {
+		let mut rng = rand::rng();
+
+		for _ in 0..moves_count {
+			match rng.random_range(0..9) {
+				0 => self.rubiks.rotate_x(0, rng.random_bool(0.5)),
+				1 => self.rubiks.rotate_x(1, rng.random_bool(0.5)),
+				2 => self.rubiks.rotate_x(2, rng.random_bool(0.5)),
+				3 => self.rubiks.rotate_y(0, rng.random_bool(0.5)),
+				4 => self.rubiks.rotate_y(1, rng.random_bool(0.5)),
+				5 => self.rubiks.rotate_y(2, rng.random_bool(0.5)),
+				6 => self.rubiks.rotate_z(0, rng.random_bool(0.5)),
+				7 => self.rubiks.rotate_z(1, rng.random_bool(0.5)),
+				8 => self.rubiks.rotate_z(2, rng.random_bool(0.5)),
+				_ => { panic!("shuffle"); },
+			}
+		}
 	}
 
 	fn add_new_action(&mut self, action: RubiksAction) {

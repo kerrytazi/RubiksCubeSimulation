@@ -2,31 +2,23 @@
 	"version": "0.2.0",
 	"configurations": [
 		{
-			"name": "Debug executable 'app'",
+			"name": "lldb Debug executable 'app'",
 			"type": "lldb",
 			"request": "launch",
 			"cargo": {
-				"args": [
-					"run",
-					"--bin=app"
-				]
+				"args": ["run", "--package=app"]
 			},
 			"args": [],
 			"terminal": "console",
-			"postDebugTask": "Close Debug Terminal"
+			//"postDebugTask": "Close Debug Terminal"
 		},
 		{
-			"name": "Debug unit tests in executable 'app'",
-			"type": "lldb",
+			"name": "msvc Debug executable 'app'",
+			"type": "cppvsdbg",
 			"request": "launch",
-			"cargo": {
-				"args": [
-					"test",
-					"--bin=app"
-				]
-			},
-			"terminal": "console",
-			"postDebugTask": "Close Debug Terminal"
+			"program": "${workspaceFolder}/target/debug/app.exe",
+			"args": [],
+			"cwd": "${workspaceRoot}"
 		}
 	]
 }
